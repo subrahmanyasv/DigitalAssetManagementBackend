@@ -1,0 +1,26 @@
+{
+  "name": "digitalassetmanagement-backend",
+  "version": "1.0.0",
+  "description": "This is the codebase of the backend of digital asset management application",
+  "license": "ISC",
+  "author": "Subrahmanya Vaidya",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.0.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.1",
+    "joi": "^17.13.3",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.16.1",
+    "multer": "^2.0.1",
+    "nodemon": "^3.1.10"
+  }
+}
