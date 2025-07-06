@@ -1,54 +1,99 @@
 import bcrypt from "bcrypt";
 import { AuthService } from "../../services/auth.service.js";
+import { TransactionService } from "../../services/transaction.service.js";
+import { ErrorHandler } from "../../utils/errorHandler.js";
 import User from "../../models/user.model.js";
+
 const authService = new AuthService();
 
 export class AuthController {
     async register(req, res) {
-        try{
-            const { email , password } = req.body;
+        try {
+            const { email, password } = req.body;
+            
+            // Validate input
             if (!email || !password) {
                 return res.status(400).json({ message: 'Email and password are required' });
             }
-            const user = await User.findOne({ email });
-            if (user) {
-                return res.status(400).json({ message: 'User already exists' });
-            }
-            const hashPassword = await bcrypt.hash(password, 10);
-            const newUser = new User({
-                email,
-                password: hashPassword,
-            });
-            await newUser.save();
 
-            const { accessToken, refreshToken } = authService.generateTokens(newUser);
-            res.cookie('refreshToken', refreshToken, {
+            // Execute registration within transaction
+            const result = await TransactionService.executeTransaction(async (session) => {
+                // Check if user already exists
+                const existingUser = await User.findOne({ email }).session(session);
+                if (existingUser) {
+                    throw ErrorHandler.createError('User already exists', 400);
+                }
+
+                // Hash password
+                const hashPassword = await bcrypt.hash(password, 10);
+
+                // Create new user
+                const newUser = new User({
+                    email,
+                    password: hashPassword,
+                });
+
+                // Save user with session
+                await newUser.save({ session });
+
+                // Generate tokens
+                const { accessToken, refreshToken } = authService.generateTokens({email, hashPassword});
+
+                return {
+                    user: newUser,
+                    accessToken,
+                    refreshToken
+                };
+            });
+
+            // Set cookie and send response (outside transaction)
+            res.cookie('refreshToken', result.refreshToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',      
                 maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
                 sameSite: 'lax', 
             });
-            res.status(201).json({ message: 'User registered successfully', accessToken });
 
-        }catch( error ){
-            console.error(error);
-            res.status(500).json({ message: 'Internal server error! Try again later.' });
+            res.status(201).json({ 
+                message: 'User registered successfully', 
+                accessToken: result.accessToken 
+            });
+
+        } catch (error) {
+            return ErrorHandler.handleDatabaseError(error, res, 'Registration');
         }
     }
-
 
     async login(req, res) {
         try {
             const { email, password } = req.body;
-            const user = await User.findOne({ email });
-            if (!user)
-                return res.status(400).json({ message: 'User not found' });
-            if (!await bcrypt.compare(password, user.password))
-                return res.status(400).json({ message: 'Incorrect password' });
 
-            const { accessToken, refreshToken } = authService.generateTokens(user);
+            // Execute login within transaction
+            const result = await TransactionService.executeTransaction(async (session) => {
+                // Find user with session
+                const user = await User.findOne({ email }).session(session);
+                if (!user) {
+                    throw ErrorHandler.createError('User not found', 400);
+                }
 
-            res.cookie('refreshToken', refreshToken, {
+                // Verify password
+                const isPasswordValid = await bcrypt.compare(password, user.password);
+                if (!isPasswordValid) {
+                    throw ErrorHandler.createError('Incorrect password', 400);
+                }
+
+                // Generate tokens
+                const { accessToken, refreshToken } = authService.generateTokens({email: user.email , password: user.password});
+
+                return {
+                    user,
+                    accessToken,
+                    refreshToken
+                };
+            });
+
+            // Set cookie and send response (outside transaction)
+            res.cookie('refreshToken', result.refreshToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
                 sameSite: 'lax',
@@ -57,25 +102,35 @@ export class AuthController {
 
             res.status(200).json({
                 message: 'Login successful',
-                accessToken,
+                accessToken: result.accessToken,
             });
+
         } catch (error) {
-            console.error(error);
-            res.status(500).json({ message: 'Internal server error! Try again later.' });
+            return ErrorHandler.handleDatabaseError(error, res, 'Login');
         }
     }
 
     async logout(req, res) {
         try {
-            res.clearCookie('refreshToken');
+            // Execute logout within transaction
+            await TransactionService.executeTransaction(async (session) => {
+                // Future: Add token blacklisting here
+                // const authHeader = req.headers['authorization'];
+                // const accessToken = authHeader && authHeader.split(' ')[1];
+                // if (accessToken) {
+                //     await BlacklistedToken.create({ token: accessToken }, { session });
+                // }
+                
+                res.clearCookie('refreshToken');
+                return { success: true };
+            });
+
             res.status(200).json({ message: 'Logged out successfully' });
+
         } catch (error) {
-            console.error(error);
-            res.status(500).json({ message: 'Internal server error! Try again later.' });
+            return ErrorHandler.handleDatabaseError(error, res, 'Logout');
         }
     }
-
-
 
     async refreshAccessToken(req, res) {
         try {
@@ -84,24 +139,24 @@ export class AuthController {
                 return res.status(401).json({ message: 'Refresh token is missing' });
             }
 
-            let user;
-            try {
-                user = authService.verifyRefreshToken(refreshToken);
+            // Execute token refresh within transaction
+            const result = await TransactionService.executeTransaction(async (session) => {
+                // Verify refresh token
+                const user = authService.verifyRefreshToken(refreshToken);
                 if (!user) {
-                    return res.status(403).json({ message: 'Invalid or expired refresh token' });
+                    throw ErrorHandler.createError('Invalid or expired refresh token', 403);
                 }
 
-                const accessToken = authService.refreshAccessToken(user);
-            } catch (error) {
-                console.error('Refresh token verification failed:', error);
-                return res.status(403).json({ message: 'Invalid or expired refresh token' });
-            }
+                // Generate new access token
+                const newAccessToken = authService.generateAccessToken(user);
 
-            const newAccessToken = authService.generateAccessToken(user);
-            res.json({ accessToken: newAccessToken });
-        }catch( error ){
-            console.error(error);
-            res.status(500).json({ message: 'Internal server error! Try again later.' });
+                return { accessToken: newAccessToken };
+            });
+
+            res.json({ accessToken: result.accessToken });
+
+        } catch (error) {
+            return ErrorHandler.handleDatabaseError(error, res, 'Token refresh');
         }
     }
 }
