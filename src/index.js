@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 
 import { connectDB } from "./config/database.config.js";
 import authRouter from "./api/routes/auth.router.js";
+import redisService from "./services/redis.service.js";
 
 // Load environment variables first
 dotenv.config();
@@ -15,6 +16,15 @@ const initializeApp = async () => {
     try {
         console.log('🚀 Starting Digital Asset Management Backend...');
         await connectDB();
+        
+        // Initialize Redis connection
+        console.log('🔗 Connecting to Redis...');
+        const redisConnected = await redisService.connect();
+        if (!redisConnected) {
+            console.warn('⚠️  Redis connection failed. Refresh token validation will be disabled.');
+        } else {
+            console.log('✅ Redis connected successfully');
+        }
         
         // Set up Express middleware
         app.use(express.json());
@@ -55,6 +65,27 @@ const initializeApp = async () => {
             console.error('❌ Server error:', error);
             process.exit(1);
         });
+        
+        // Graceful shutdown handling
+        const gracefulShutdown = async (signal) => {
+            console.log(`\n🛑 Received ${signal}. Starting graceful shutdown...`);
+            
+            server.close(async () => {
+                console.log('✅ HTTP server closed');
+                
+                try {
+                    await redisService.disconnect();
+                    console.log('✅ Redis disconnected');
+                    process.exit(0);
+                } catch (error) {
+                    console.error('❌ Error during shutdown:', error);
+                    process.exit(1);
+                }
+            });
+        };
+        
+        process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+        process.on('SIGINT', () => gracefulShutdown('SIGINT'));
         
         console.log('🎉 Application initialized successfully!');
         

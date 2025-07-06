@@ -12,7 +12,7 @@ const userSchema = new Schema({
         type: String,
         required: true,
         trim: true,
-        select: false, // Do not return password in queries
+        // select: false, // Do not return password in queries
     },
     role: {
         type: String,

@@ -37,7 +37,7 @@ export class AuthController {
                 await newUser.save({ session });
 
                 // Generate tokens
-                const { accessToken, refreshToken } = authService.generateTokens({email, hashPassword});
+                const { accessToken, refreshToken } = await authService.generateTokens({email, hashPassword});
 
                 return {
                     user: newUser,
@@ -83,7 +83,7 @@ export class AuthController {
                 }
 
                 // Generate tokens
-                const { accessToken, refreshToken } = authService.generateTokens({email: user.email , password: user.password});
+                const { accessToken, refreshToken } = await authService.generateTokens({email: user.email , password: user.password});
 
                 return {
                     user,
@@ -112,14 +112,33 @@ export class AuthController {
 
     async logout(req, res) {
         try {
+            const refreshToken = req.headers.cookie.split("=")[1];
+
+            if (!refreshToken) {
+                throw ErrorHandler.createError('Invalid refresh token format', 401);
+            }
+
+            let userEmail = null;
+
+            // Get user email from refresh token if available
+            if (refreshToken) {
+                const decoded = await authService.verifyRefreshToken(refreshToken);
+                if (decoded) {
+                    userEmail = decoded.email;
+                    console.log(userEmail);
+                }
+            }
+
+            if (!userEmail) {
+                throw ErrorHandler.createError('Invalid or expired refresh token - user not found', 401);
+            }
+
             // Execute logout within transaction
             await TransactionService.executeTransaction(async (session) => {
-                // Future: Add token blacklisting here
-                // const authHeader = req.headers['authorization'];
-                // const accessToken = authHeader && authHeader.split(' ')[1];
-                // if (accessToken) {
-                //     await BlacklistedToken.create({ token: accessToken }, { session });
-                // }
+                // Invalidate refresh token in Redis
+                if (userEmail) {
+                    await authService.invalidateRefreshToken(userEmail);
+                }
                 
                 res.clearCookie('refreshToken');
                 return { success: true };
@@ -141,16 +160,21 @@ export class AuthController {
 
             // Execute token refresh within transaction
             const result = await TransactionService.executeTransaction(async (session) => {
-                // Verify refresh token
-                const user = authService.verifyRefreshToken(refreshToken);
-                if (!user) {
+                // Verify and refresh tokens using Redis validation
+                const tokens = await authService.refreshTokens(refreshToken);
+                if (!tokens) {
                     throw ErrorHandler.createError('Invalid or expired refresh token', 403);
                 }
 
-                // Generate new access token
-                const newAccessToken = authService.generateAccessToken(user);
+                return tokens;
+            });
 
-                return { accessToken: newAccessToken };
+            // Set new refresh token cookie
+            res.cookie('refreshToken', result.refreshToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
             });
 
             res.json({ accessToken: result.accessToken });
