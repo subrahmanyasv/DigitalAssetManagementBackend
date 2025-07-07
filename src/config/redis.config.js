@@ -1,11 +1,6 @@
-/**
- * Redis configuration settings
- */
 export const redisConfig = {
-    // Redis connection URL
     url: process.env.REDIS_URL || 'redis://localhost:6379',
     
-    // Redis connection options
     connection: {
         socket: {
             reconnectStrategy: (retries) => {
@@ -41,21 +36,12 @@ export const redisConfig = {
     }
 };
 
-/**
- * Get Redis key with prefix
- * @param {string} prefix - Key prefix
- * @param {string} identifier - Unique identifier
- * @returns {string} - Formatted Redis key
- */
+
 export const getRedisKey = (prefix, identifier) => {
     return `${prefix}${identifier}`;
 };
 
-/**
- * Get refresh token key
- * @param {string} userEmail - User email
- * @returns {string} - Redis key for refresh token
- */
+
 export const getRefreshTokenKey = (userEmail) => {
     return getRedisKey(redisConfig.keyPrefixes.refreshToken, userEmail);
 }; 
