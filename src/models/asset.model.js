@@ -7,7 +7,7 @@ const assetSchema = new mongoose.Schema({
   file_path: { type: String, required: true },
   file_type: { type: String, required: true },
   thumbnail_url: { type: String },
-  owner_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  owner_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   tags: [{ type: String }],
   status: { 
     type: String, 
@@ -19,4 +19,4 @@ const assetSchema = new mongoose.Schema({
 
 
 const Asset = mongoose.model('Asset', assetSchema);
-module.exports = Asset;
+export default Asset;

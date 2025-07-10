@@ -1,9 +1,13 @@
 import express from "express";
 import dotenv from "dotenv";
+import cookieParser from "cookie-parser";
 
 import { connectDB } from "./config/database.config.js";
-import authRouter from "./api/routes/auth.router.js";
 import redisService from "./services/redis.service.js";
+
+import authRouter from "./api/routes/auth.router.js";
+import assetRouter from "./api/routes/asset.router.js";
+import {authenticate} from "./api/middlewares/auth.middleware.js";
 
 // Load environment variables first
 dotenv.config();
@@ -15,6 +19,7 @@ const PORT = process.env.PORT || 3000;
 const initializeApp = async () => {
     try {
         console.log('🚀 Starting Digital Asset Management Backend...');
+        console.log(`Server path: ${process.cwd()}`);
         await connectDB();
         
         // Initialize Redis connection
@@ -29,6 +34,7 @@ const initializeApp = async () => {
         // Set up Express middleware
         app.use(express.json());
         app.use(express.urlencoded({ extended: true }));
+        app.use(cookieParser());
         
         // Add basic security headers
         app.use((req, res, next) => {
@@ -40,6 +46,9 @@ const initializeApp = async () => {
         
         // API routes
         app.use('/api/auth', authRouter);
+
+        app.use(authenticate);
+        app.use('/api/asset', assetRouter);
         
         // 404 handler
         app.use((req, res) => {

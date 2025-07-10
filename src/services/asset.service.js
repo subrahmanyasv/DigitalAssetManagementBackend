@@ -36,19 +36,40 @@ export class AssetService {
         }
     }
 
-    async getAssets(userId) {
+
+    //Includes Pagination feature.
+    async getAssets(userId , page = 1 , limit = 10) {
         if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
             return { success: false, message: 'Valid userId is required' };
         }
         try {
-            const assets = await Asset.find({ owner_id: userId, status: 'active' });
-            return { success: true, data: assets || [] };
+            const skip = ( page - 1 ) * limit;
+
+            const [ assets , totalCount ] = await Promise.all([
+                Asset.find({ owner_id : userId , status : 'active' })
+                .skip(skip)
+                .limit(limit),
+                Asset.countDocuments({ owner_id : userId, status: 'active' })
+            ])
+
+            const totalPages = Math.ceil(totalCount / limit);
+
+            return { success: true, data: {
+                assets: assets,
+                pagination: {
+                    page,
+                    limit,
+                    totalPages,
+                    totalCount
+                }
+            }};
         } catch (error) {
             console.error('Error fetching assets:', error);
             return { success: false, message: 'Error fetching assets' };
         }
     }
 
+    
     async getAsset(assetId, userId) {
         if (!assetId || !mongoose.Types.ObjectId.isValid(assetId)) {
             return { success: false, message: 'Valid assetId is required' };
@@ -92,3 +113,6 @@ export class AssetService {
         }
     }
 }
+
+const assetService = new AssetService();
+export { assetService };

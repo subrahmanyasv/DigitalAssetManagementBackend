@@ -16,7 +16,7 @@ export class RedisService {
      */
     async connect() {
         try {
-                    this.client = createClient({
+            this.client = createClient({
             url: redisConfig.url,
             socket: redisConfig.connection.socket
         });
@@ -60,19 +60,13 @@ export class RedisService {
         }
     }
 
-    /**
-     * Store refresh token in Redis with expiration
-     * @param {string} userId - User ID or email
-     * @param {string} refreshToken - The refresh token
-     * @param {number} expiresIn - Expiration time in seconds (default: from config)
-     */
-    async storeRefreshToken(userId, refreshToken, expiresIn = redisConfig.tokenExpiration.refreshToken) {
+    async storeRefreshToken(userEmail, refreshToken, expiresIn = redisConfig.tokenExpiration.refreshToken) {
         try {
             if (!this.isConnected || !this.client) {
                 throw new Error('Redis not connected');
             }
 
-            const key = getRefreshTokenKey(userId);
+            const key = getRefreshTokenKey(userEmail);
             await this.client.setEx(key, expiresIn, refreshToken);
             return true;
         } catch (error) {
@@ -81,18 +75,14 @@ export class RedisService {
         }
     }
 
-    /**
-     * Get refresh token from Redis
-     * @param {string} userId - User ID or email
-     * @returns {string|null} - The refresh token or null if not found
-     */
-    async getRefreshToken(userId) {
+    
+    async getRefreshToken(userEmail) {
         try {
             if (!this.isConnected || !this.client) {
                 throw new Error('Redis not connected');
             }
 
-            const key = getRefreshTokenKey(userId);
+            const key = getRefreshTokenKey(userEmail);
             const token = await this.client.get(key);
             return token;
         } catch (error) {
@@ -101,19 +91,14 @@ export class RedisService {
         }
     }
 
-    /**
-     * Validate refresh token by comparing with stored token
-     * @param {string} userId - User ID or email
-     * @param {string} refreshToken - The refresh token to validate
-     * @returns {boolean} - True if token is valid, false otherwise
-     */
-    async validateRefreshToken(userId, refreshToken) {
+    
+    async validateRefreshToken(userEmail, refreshToken) {
         try {
             if (!this.isConnected || !this.client) {
                 throw new Error('Redis not connected');
             }
 
-            const storedToken = await this.getRefreshToken(userId);
+            const storedToken = await this.getRefreshToken(userEmail);
             return storedToken === refreshToken;
         } catch (error) {
             console.error('Error validating refresh token:', error);
@@ -121,18 +106,14 @@ export class RedisService {
         }
     }
 
-    /**
-     * Invalidate/remove refresh token from Redis
-     * @param {string} userId - User ID or email
-     * @returns {boolean} - True if token was invalidated, false otherwise
-     */
-    async invalidateRefreshToken(userId) {
+    
+    async invalidateRefreshToken(userEmail) {
         try {
             if (!this.isConnected || !this.client) {
                 throw new Error('Redis not connected');
             }
 
-            const key = getRefreshTokenKey(userId);
+            const key = getRefreshTokenKey(userEmail);
             const result = await this.client.del(key);
             return result > 0;
         } catch (error) {
@@ -141,18 +122,11 @@ export class RedisService {
         }
     }
 
-    /**
-     * Check if Redis is connected
-     * @returns {boolean} - True if connected, false otherwise
-     */
+    
     isRedisConnected() {
         return this.isConnected && this.client !== null;
     }
 
-    /**
-     * Get Redis client instance (for advanced operations)
-     * @returns {Object|null} - Redis client or null if not connected
-     */
     getClient() {
         return this.isConnected ? this.client : null;
     }
