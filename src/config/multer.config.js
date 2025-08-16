@@ -67,7 +67,7 @@ const fileFilter = (req, file, cb) => {
         'application/vnd.openxmlformats-officedocument.presentationml.presentation'
     ];
     if (allowedImage || allowedVideo || allowedDocs.includes(file.mimetype)) {
-        cb(null, true);
+    cb(null, true);
     } else {
         cb(new Error('Unsupported file type'), false);
     }

@@ -13,6 +13,7 @@ class AssetController {
     async createAssetController(req, res) {
         try {
             const result = await TransactionService.executeTransaction(async (session) => {
+                console.log("Here");
                 // Build payload from req.body and req.file
                 const { owner_id, description, tags } = req.body;
                 const { originalname, filename, mimetype, path: file_path, size } = req.file || {};
@@ -27,7 +28,7 @@ class AssetController {
                 };
 
                 const assetResult = await assetService.createAsset(payload);
-                //TODO: create a bullMQ workflow to generate thumbnail.
+                console.log("Here2");
                 return assetResult && assetResult.success ? assetResult : null;
             });
             if (result) {

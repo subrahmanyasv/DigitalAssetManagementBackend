@@ -1,6 +1,7 @@
 import Asset from '../models/asset.model.js';
 import mongoose from 'mongoose';
 import Joi from 'joi';
+import thumbnailService from './thumbnail.service.js';
 
 // Define Joi schema for asset creation
 const assetSchema = Joi.object({
@@ -20,6 +21,8 @@ const assetSchema = Joi.object({
     created_at: Joi.date()
 });
 
+// Thumbnail generation is now handled by the dedicated ThumbnailService
+
 export class AssetService {
     async createAsset(payload) {
         // Validate using Joi schema
@@ -29,6 +32,19 @@ export class AssetService {
         }
         try {
             const newAsset = await Asset.create(value);
+            // Add thumbnail job if image
+            if (value.file_type && value.file_type.startsWith('image/')) {
+                try {
+                    await thumbnailService.addThumbnailJob(
+                        newAsset._id,
+                        value.file_path,
+                        value.file_type
+                    );
+                } catch (thumbnailError) {
+                    console.error('Failed to queue thumbnail generation:', thumbnailError);
+                    // Don't fail asset creation if thumbnail queuing fails
+                }
+            }
             return { success: true, data: newAsset };
         } catch (error) {
             console.error('Error creating asset:', error);
