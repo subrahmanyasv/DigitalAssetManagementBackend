@@ -13,7 +13,6 @@ class AssetController {
     async createAssetController(req, res) {
         try {
             const result = await TransactionService.executeTransaction(async (session) => {
-                console.log("Here");
                 // Build payload from req.body and req.file
                 const { owner_id, description, tags } = req.body;
                 const { originalname, filename, mimetype, path: file_path, size } = req.file || {};
@@ -26,14 +25,20 @@ class AssetController {
                     tags: tags ? (Array.isArray(tags) ? tags : [tags]) : [],
                     created_at: new Date(),
                 };
+                console.log(payload);
 
                 const assetResult = await assetService.createAsset(payload);
                 console.log("Here2");
                 return assetResult && assetResult.success ? assetResult : null;
             });
-            if (result) {
+            if (result && result.success) {
                 return res.status(201).json({ message: 'Asset created successfully', asset: result.data });
             }
+            if (result && result.message === "Payload structure dosen't match the required format") {
+                return res.status(400).json({ message: result.message });
+            }
+            return res.status(500).json({ message: (result && result.message) ? result.message : 'Asset creation failed' });
+
         } catch (error) {
             return ErrorHandler.handleDatabaseError(error, res, 'Asset Creation');
         }

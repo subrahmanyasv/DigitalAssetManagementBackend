@@ -17,12 +17,14 @@ export class AuthService{
     }
 
     async generateTokens(payload){
-        const accessToken = TokenUtils.generateAccessToken(payload, ACCESS_TOKEN_SECRET);
-        const refreshToken = TokenUtils.generateRefreshToken(payload, REFRESH_TOKEN_SECRET);
+        const { email } = payload;
+        const cleanPayload = { email };
+        const accessToken = TokenUtils.generateAccessToken(cleanPayload, ACCESS_TOKEN_SECRET);
+        const refreshToken = TokenUtils.generateRefreshToken(cleanPayload, REFRESH_TOKEN_SECRET);
 
         // Store refresh token in Redis
         if (this.redisService.isRedisConnected()) {
-            await this.redisService.storeRefreshToken(payload.email, refreshToken);
+            await this.redisService.storeRefreshToken(email, refreshToken);
         }
 
         return { accessToken, refreshToken };
@@ -53,7 +55,8 @@ export class AuthService{
     }
 
     generateAccessToken(payload) {
-        return TokenUtils.generateAccessToken(payload, ACCESS_TOKEN_SECRET);
+        const { email } = payload;
+        return TokenUtils.generateAccessToken({ email }, ACCESS_TOKEN_SECRET);
     }
 
     async invalidateRefreshToken(userEmail) {
@@ -75,13 +78,16 @@ export class AuthService{
                 return null;
             }
 
-            // Generate new tokens
-            const newAccessToken = this.generateAccessToken(decoded);
-            const newRefreshToken = TokenUtils.generateRefreshToken(decoded, REFRESH_TOKEN_SECRET);
+            const { email } = decoded;
+            const payload = { email };
+
+            // Generate new tokens with clean payload
+            const newAccessToken = this.generateAccessToken(payload);
+            const newRefreshToken = TokenUtils.generateRefreshToken(payload, REFRESH_TOKEN_SECRET);
 
             // Update refresh token in Redis
             if (this.redisService.isRedisConnected()) {
-                await this.redisService.storeRefreshToken(decoded.email, newRefreshToken);
+                await this.redisService.storeRefreshToken(email, newRefreshToken);
             }
 
             return {

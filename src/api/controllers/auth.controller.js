@@ -37,7 +37,7 @@ export class AuthController {
                 await newUser.save({ session });
 
                 // Generate tokens
-                const { accessToken, refreshToken } = await authService.generateTokens({email, hashPassword});
+                const { accessToken, refreshToken } = await authService.generateTokens({ email });
 
                 return {
                     user: newUser,
@@ -83,7 +83,7 @@ export class AuthController {
                 }
 
                 // Generate tokens
-                const { accessToken, refreshToken } = await authService.generateTokens({email: user.email , password: user.password});
+                const { accessToken, refreshToken } = await authService.generateTokens({ email: user.email });
 
                 return {
                     user,
@@ -154,6 +154,7 @@ export class AuthController {
     async refreshAccessToken(req, res) {
         try {
             const { refreshToken } = req.cookies;
+            console.log(refreshToken);
             if (!refreshToken) {
                 return res.status(401).json({ message: 'Refresh token is missing' });
             }

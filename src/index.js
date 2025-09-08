@@ -16,6 +16,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || (process.platform === 'win32' ? '127.0.0.1' : '0.0.0.0');
 
 // Initialize application
 const initializeApp = async () => {
@@ -77,8 +78,9 @@ const initializeApp = async () => {
         });
         
         // Start server only after database is connected
-        const server = app.listen(PORT, () => {
-            console.log(`✅ Server running on port ${PORT}`);
+        
+        const server = app.listen(PORT, HOST, () => {
+            console.log(`✅ Server running on http://${HOST}:${PORT}`);
         });
         
         // Handle server errors

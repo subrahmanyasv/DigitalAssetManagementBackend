@@ -53,8 +53,7 @@ export class TokenUtils {
                 return null;
             }
             return {
-                email: decoded.email,
-                password : decoded.password
+                email: decoded.email
             };
         } catch (error) {
             console.error('Error extracting user from token:', error);

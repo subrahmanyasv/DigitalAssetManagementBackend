@@ -25,12 +25,16 @@ const assetSchema = Joi.object({
 
 export class AssetService {
     async createAsset(payload) {
+        console.log("Here1");
         // Validate using Joi schema
         const { error, value } = assetSchema.validate(payload, { abortEarly: false, stripUnknown: true });
+        console.log("Here4");
         if (error) {
+            console.log("Here5");
             return { success: false, message: "Payload structure dosen't match the required format" };
         }
         try {
+            console.log("Here3");
             const newAsset = await Asset.create(value);
             // Add thumbnail job if image
             if (value.file_type && value.file_type.startsWith('image/')) {
